@@ -1,0 +1,9 @@
+[general]
+
+folder_gpx = /opt/draw-gpx-bot/gpxfiles
+folder_images = /opt/draw-gpx-bot/images
+file_log = /opt/draw-gpx-bot/log/draw-gpx-bot.log
+mapnik_style_xml = /opt/draw-gpx-bot/osm.xml
+cmd_nik4 = ./nik4.py
+token = SECRETTOKEN
+

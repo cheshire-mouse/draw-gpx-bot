@@ -1,0 +1,15 @@
+[Unit]
+Description = Draw GPX telegram bot
+After = network.target
+
+[Service]
+Type = simple
+User = drawgpxbot
+Group = drawgpxbot
+ExecStart = /opt/draw-gpx-bot/drawgpxbot.py
+WorkingDirectory = /opt/draw-gpx-bot
+EnvironmentFile = /opt/draw-gpx-bot/drawgpxbot.env
+
+[Install]
+WantedBy = multi-user.target
+
