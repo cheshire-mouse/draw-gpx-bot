@@ -132,9 +132,13 @@ def gpx_draw(gpx_path,zoom=None,fmt='png'):
     ymin = bbox['ymin'] - (bbox['ymax'] - bbox['ymin']) * 0.05 
     xmax = bbox['xmax'] + (bbox['xmax'] - bbox['xmin']) * 0.05 
     ymax = bbox['ymax'] + (bbox['ymax'] - bbox['ymin']) * 0.05 
-    cmd_nik4 = [options['cmd_nik4'],
+    cmd_nik4 = [options['cmd_nik4']]
+    if 'folder_fonts' in options:
+        cmd_nik4 += ['--fonts',options['folder_fonts']]
+    cmd_nik4 += [
         "-b",str(xmin),str(ymin),str(xmax),str(ymax),'-z',str(zoom),
-        '-f',fmt,options['mapnik_style_xml'],image_path]
+        '-f',fmt,options['mapnik_style_xml'],image_path
+        ]
     logger.debug(' '.join(cmd_nik4))
     retcode = subprocess.call(cmd_nik4)
     if retcode != 0:
@@ -235,6 +239,19 @@ def on_cmd_gpxdraw(bot, update, args, job_queue, chat_data):
         logger.error('cant add drawing job: {}'.format(e))
         update.message.reply_text('Ничего не вышло. Мои глубочайшие извинения.')
 
+def on_cmd_gpxinfo(bot, update, chat_data):
+    try:
+        if 'last gpx' not in chat_data:
+            update.message.reply_text(u'Треков пока не получал')
+        else:
+            update.message.reply_text(
+                 u'Последний трек: {0}'.format(chat_data['last gpx'].file_name))
+    except Exception as e:
+        if hasattr(e, 'message'):
+            logger.error('Cant process gpxinfo cmd: {}'.format(e.message))
+        else:
+            logger.error('Cant process gpxinfo cmd: {}'.format(e))
+ 
 # Message handlers
 
 def on_document(bot, update, chat_data):
@@ -242,7 +259,9 @@ def on_document(bot, update, chat_data):
     if re.match('.*\.gpx$',update.message.document.file_name,re.I) != None:
         update.message.reply_text(u'Нашел трек: {0}'.format(update.message.document.file_name))
         chat_data['last gpx'] = update.message.document
-        logger.info(u'document {0} passed by ...'.format(update.message.document.file_name))
+        logger.info(u'document {0} from {1}'.format(
+            update.message.document.file_name,
+            update.message.from_user.name))
 
 # Error handler
 
@@ -267,6 +286,8 @@ def main():
     dp.add_handler(CommandHandler("gpxdraw", on_cmd_gpxdraw,
                                   pass_args=True,
                                   pass_job_queue=True,
+                                  pass_chat_data=True))
+    dp.add_handler(CommandHandler("gpxinfo", on_cmd_gpxinfo,
                                   pass_chat_data=True))
 
      # log all errors
