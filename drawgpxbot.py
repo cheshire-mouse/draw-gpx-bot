@@ -30,6 +30,7 @@ import dateutil.parser
 from dateutil import tz
 from geographiclib.geodesic import Geodesic
 import math
+import argparse
 
 # Read config
 config = ConfigParser.RawConfigParser()
@@ -52,6 +53,16 @@ class GPXParseException(Exception):
     """ Something wrong with XML format """
     def __init__(self, message):
         self.message = message
+
+class ArgumentParseError(Exception):
+    """ Can't parse command arguments """
+    def __init__(self, message):
+        self.message = message
+
+class SilentArgumentParser(argparse.ArgumentParser):
+    """ Argument Parser, no message printing, only exceptions """
+    def error(self, message):
+        raise ArgumentParseError(('Argument parsing error: %s\n') % (message))
 
 class Gpx2JSONTarget:
     """ XML handler """
@@ -201,7 +212,7 @@ def timestamp2hhmmss(ts):
     return "{:02d}:{:02d}:{:02d}".format(hh,mm,ss)
 
 
-def gpx_draw(gpx_path,zoom=None,fmt='png'):
+def gpx_draw(gpx_path,fmt,zoom,color,width):
     image_path = ''.join([options['folder_images'],'/',
             os.path.splitext(os.path.basename(gpx_path))[0],
             '.',fmt])
@@ -227,6 +238,9 @@ def gpx_draw(gpx_path,zoom=None,fmt='png'):
     cmd_nik4 = [options['cmd_nik4']]
     if 'folder_fonts' in options:
         cmd_nik4 += ['--fonts',options['folder_fonts']]
+    cmd_nik4 += ['--vars',]
+    cmd_nik4 += ['track_color={}'.format(color)]
+    cmd_nik4 += ['track_width={}'.format(width)]
     cmd_nik4 += [
         "-b",str(xmin),str(ymin),str(xmax),str(ymax),'-z',str(zoom),
         '-f',fmt,options['mapnik_style_xml'],image_path
@@ -245,14 +259,16 @@ def job_gpx_draw(bot, job):
     try:
         chat_id = job.context['chat_id']
         zoom = job.context['zoom']
-        fmt = job.context['fmt']
+        fmt = job.context['format']
+        color = job.context['color']
+        width = job.context['width']
         file_name = job.context['document'].file_name
         logger.info(u'start job to draw gpx {0} (fmt={1}, zoom={2})'.format(file_name,fmt,zoom))
         fl = job.context['document'].get_file()
         fl_path = ''.join([options['folder_gpx'], '/track.gpx'])
         fl.download(custom_path=fl_path)
         logger.debug(u'downloaded gpx {0} to {1}'.format(file_name,fl_path))
-        image_path = gpx_draw(fl_path,zoom,fmt)
+        image_path = gpx_draw(fl_path,fmt,zoom,color,width)
         logger.debug(u'nik4 finished with {0}'.format(file_name))
         f=open(image_path,"rb");
         if fmt=='png':
@@ -340,9 +356,15 @@ def on_cmd_help(bot, update):
     help_message += '/license - лицензия/копирайты\n'
     help_message += '/gpxname - имя последнего трека\n'
     help_message += '/gpxstat - статистика по последнему треку\n'
-    help_message += '/gpxdraw - нарисовать последний трек\n'
-    help_message += '/gpxdraw <zoom 1-14> <format png|svg>\n'
-    help_message += '         - если точно знаешь, чего хочешь'
+    help_message += '/gpxdraw [<опции>] - нарисовать\n'
+    help_message += '                     последний трек\n'
+    help_message += '         опции:\n'
+    help_message += '           -format - png|svg\n'
+    help_message += '           -zoom   - зум 1-15\n'
+    help_message += '           -color  - цвет\n'
+    help_message += '              red|orange|yellow|green\n'
+    help_message += '              blue|indigo|violet\n'
+    help_message += '           -width  - ширина 1-50'
     update.message.reply_text(help_message)
 
 def on_cmd_license(bot, update):
@@ -357,40 +379,45 @@ def on_cmd_gpxdraw(bot, update, args, job_queue, chat_data):
     logger.debug(u'cmd gpxdraw, args {0}'.format(str(args)))
     chat_id = update.message.chat_id
     try:
+        parser = SilentArgumentParser(add_help=False)
+        parser.add_argument("-format",required=False, 
+            choices=['png','svg'], default='png')
+        parser.add_argument("-zoom",required=False, 
+            type = int, choices = range(1,16), default=12)
+        parser.add_argument("-color",required=False, 
+            choices=['red','orange','yellow','green','blue','indigo','violet'], 
+            default=options['track_color'])
+        parser.add_argument("-width",required=False, 
+            type = int, choices = range(1,51), default=options['track_width'])
+
+        cmd_options = parser.parse_args(args)
+
         if 'last gpx' not in chat_data:
             update.message.reply_text('Не видел никаких треков')
             return
-        elif ( len(args) not in [0,2] or
-            ( len(args) == 2 and ( int(args[0]) not in range(1,15) or
-                args[1] not in ['png','svg']  ) ) ):
-            update.message.reply_text('Ерунда какая-то. Посмотри /help')
             return
         else:
             logger.info(u'add job to draw {0}'.format(chat_data['last gpx'].file_name))
             update.message.reply_text(u'Добавил в список дел:'+
                 u' нарисовать {0}'.format(chat_data['last gpx'].file_name))
-            if len(args) == 0: 
-                job_queue.run_once(job_gpx_draw,1,
-                    context={
-                        'chat_id':chat_id,
-                        'zoom':12,
-                        'fmt':'png',
-                        'document':chat_data['last gpx']
-                    }
-                )
-            else:
-                job_queue.run_once(job_gpx_draw,1,
-                    context={
-                        'chat_id':chat_id,
-                        'zoom':int(args[0]),
-                        'fmt':args[1],
-                        'document':chat_data['last gpx']
-                    }
-                )
+            job_queue.run_once(job_gpx_draw,1,
+                context={
+                    'chat_id':chat_id,
+                    'format':cmd_options.format,
+                    'zoom':cmd_options.zoom,
+                    'color':cmd_options.color,
+                    'width':cmd_options.width,
+                    'document':chat_data['last gpx']
+                }
+            )
 
+    except ArgumentParseError as e:
+        logger.error('cmd args parse error: {}'.format(e.message))
+        update.message.reply_text('Ерунда какая-то. Посмотри /help')
     except (KeyError, IndexError, ValueError) as e:
         logger.error('cant add drawing job: {}'.format(e))
         update.message.reply_text('Ничего не вышло. Мои глубочайшие извинения.')
+        
 
 def on_cmd_gpxname(bot, update, chat_data):
     try:

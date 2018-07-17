@@ -7,4 +7,6 @@ file_log = /opt/draw-gpx-bot/log/draw-gpx-bot.log
 mapnik_style_xml = /opt/draw-gpx-bot/osm.xml
 cmd_nik4 = ./nik4.py
 token = SECRETTOKEN
+track_color = blue
+track_width = 5
 
