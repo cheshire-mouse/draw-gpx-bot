@@ -350,6 +350,8 @@ def job_gpx_stat(bot, job):
 # Command handlers
 
 def on_cmd_help(bot, update):
+    logging.info(u'cmd /help from {0}'.format(
+        update.message.from_user.name))
     help_message  = 'Рисую GPS треки. Безвозмездно (т.е. даром)\n'
     help_message += 'Файлы шли в GPX формате\n\n'
     help_message += '/help    - справка\n'
@@ -368,6 +370,8 @@ def on_cmd_help(bot, update):
     update.message.reply_text(help_message)
 
 def on_cmd_license(bot, update):
+    logging.info(u'cmd /license from {0}'.format(
+        update.message.from_user.name))
     lic_message  = 'Лицензия на карту\n'
     lic_message += 'принадлежит ребятам из OpenStreetMap\n'
     lic_message += 'https://www.openstreetmap.org/copyright'
@@ -376,7 +380,9 @@ def on_cmd_license(bot, update):
 
 def on_cmd_gpxdraw(bot, update, args, job_queue, chat_data):
     """Add job to draw last GPX track"""
-    logger.debug(u'cmd gpxdraw, args {0}'.format(str(args)))
+    logging.info(u'cmd /gpxdraw from {0}'.format(
+        update.message.from_user.name))
+    logger.debug(u'cmd /gpxdraw, args {0}'.format(str(args)))
     chat_id = update.message.chat_id
     try:
         parser = SilentArgumentParser(add_help=False)
@@ -420,6 +426,8 @@ def on_cmd_gpxdraw(bot, update, args, job_queue, chat_data):
         
 
 def on_cmd_gpxname(bot, update, chat_data):
+    logging.info(u'cmd /gpxname from {0}'.format(
+        update.message.from_user.name))
     try:
         if 'last gpx' not in chat_data:
             update.message.reply_text(u'Треков пока не получал')
@@ -434,7 +442,8 @@ def on_cmd_gpxname(bot, update, chat_data):
 
 def on_cmd_gpxstat(bot, update, job_queue, chat_data):
     """Add job to collect last GPX track statistics"""
-    logger.debug(u'cmd gpxstat')
+    logging.info(u'cmd /gpxstat from {0}'.format(
+        update.message.from_user.name))
     chat_id = update.message.chat_id
     try:
         if 'last gpx' not in chat_data:
@@ -455,6 +464,9 @@ def on_cmd_gpxstat(bot, update, job_queue, chat_data):
         logger.error('cant add drawing job: {}'.format(e))
         update.message.reply_text('Ничего не вышло. Мои глубочайшие извинения.')
 
+def on_cmd_unknown(bot, update):
+    logging.info(u'cmd {0} from {1}'.format(
+        update.message.text[:30],update.message.from_user.name))
 
 # Message handlers
 
@@ -504,6 +516,9 @@ def main():
     # on messages with documents
     dp.add_handler(MessageHandler(Filters.document,on_document,
                                   pass_chat_data=True))
+
+    # on unknown command
+    dp.add_handler(MessageHandler(Filters.command,on_cmd_unknown))
 
     # Start the Bot
     updater.start_polling(clean=True)
